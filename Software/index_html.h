@@ -8,7 +8,7 @@ static const char HTML[] PROGMEM = R"HTML(
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=yes">
   <title>NodeATE</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23141618'/%3E%3Cpolygon points='18,3 10,17 15,17 14,29 22,15 17,15' fill='%23e8a000'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=B612+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -50,7 +50,7 @@ static const char HTML[] PROGMEM = R"HTML(
 
     /* ── Reset ─────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { font-size: 14px; }
+    html { font-size: 16px; }
 
     body {
       font-family: 'Barlow Condensed', sans-serif;
@@ -77,7 +77,7 @@ static const char HTML[] PROGMEM = R"HTML(
       justify-content: space-between;
       align-items: center;
       margin-bottom: 10px;
-      max-width: 860px;
+      max-width: 1100px;
       margin-left: auto;
       margin-right: auto;
     }
@@ -99,7 +99,7 @@ static const char HTML[] PROGMEM = R"HTML(
     /* ── Resume fault banner ───────────────────────────────── */
     .fault-banner {
       display: none;
-      max-width: 860px;
+      max-width: 1100px;
       margin: 0 auto 10px;
       background: #1a1400;
       border: 2px solid var(--fault);
@@ -118,7 +118,7 @@ static const char HTML[] PROGMEM = R"HTML(
     /* ── Connection lost banner ──────────────────────── */
     .conn-banner {
       display: none;
-      max-width: 860px;
+      max-width: 1100px;
       margin: 0 auto 10px;
       background: #1a0a0a;
       border: 2px solid var(--red-hi);
@@ -137,7 +137,7 @@ static const char HTML[] PROGMEM = R"HTML(
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
-      max-width: 860px;
+      max-width: 1100px;
       margin: auto;
     }
     .span2 { grid-column: 1 / -1; }

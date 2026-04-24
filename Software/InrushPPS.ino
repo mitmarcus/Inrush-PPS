@@ -32,8 +32,7 @@ m5::unit::UnitINA226_10A ina226;
 // ─────────────────────────── Config ───────────────────────────
 #define WIFI_SSID "YOUR_SSID"
 #define WIFI_PASS "YOUR_PASSWORD"
-#define CURRENT_LIMIT 5.0f   // A  (module max)
-#define POWER_LIMIT_W 100.0f // W  (derate to rated; peak is 150W)
+#define CURRENT_LIMIT 5.0f // A  (module max)
 #define I2C_SPEED 400000U
 #define PPS_ADDR 0x35
 
@@ -125,15 +124,6 @@ float safeVoltage(float v)
   return v;
 }
 
-// Clamp current so V*I never exceeds POWER_LIMIT_W
-float currentForVoltage(float v)
-{
-  if (v < 0.1f)
-    return CURRENT_LIMIT;
-  float maxA = POWER_LIMIT_W / v;
-  return (maxA < CURRENT_LIMIT) ? maxA : CURRENT_LIMIT;
-}
-
 // ──────────────────────────────────────────────────────────────
 //  PPS I2C helpers — talk to PPS via M5.In_I2C (shared internal bus)
 // ──────────────────────────────────────────────────────────────
@@ -193,7 +183,7 @@ bool initPPS()
     return false;
   }
   ppsSetEnable(false);
-  ppsSetCurrent(currentForVoltage(cmdV));
+  ppsSetCurrent(CURRENT_LIMIT);
   ppsSetVoltage(cmdV);
   lastPpsCommandedV = cmdV;
   ppsOn = false;
@@ -218,7 +208,6 @@ void setPpsVoltage(float v)
     return;
   v = safeVoltage(v);
   float actual = safeVoltage(v + dropComp);
-  ppsSetCurrent(currentForVoltage(actual));
   ppsSetVoltage(actual);
   lastPpsCommandedV = actual;
 }
@@ -985,8 +974,15 @@ void handleReplayRange()
 {
   int inVal = server.arg("in").toInt();
   int outVal = server.arg("out").toInt();
-  replayRangeIn = (inVal >= 0 && inVal < csvCount) ? inVal : -1;
-  replayRangeOut = (outVal >= 0 && outVal < csvCount) ? outVal : -1;
+  int newIn = (inVal >= 0 && inVal < csvCount) ? inVal : -1;
+  int newOut = (outVal >= 0 && outVal < csvCount) ? outVal : -1;
+  if (newIn >= 0 && newOut >= 0 && newOut < newIn)
+  {
+    server.send(400, "text/plain", "INVALID RANGE: OUT < IN");
+    return;
+  }
+  replayRangeIn = newIn;
+  replayRangeOut = newOut;
   char resp[60];
   snprintf(resp, sizeof(resp), "RANGE IN=%d OUT=%d", replayRangeIn, replayRangeOut);
   server.send(200, "text/plain", resp);
@@ -1102,7 +1098,20 @@ void setup()
 
   server.begin();
 
-  esp_task_wdt_add(NULL); // watchdog: resets device if loop() stalls
+  // Watchdog: 10s timeout tolerates I2C retry storms + flash writes without
+  // spurious resets. Panic mode prints stack trace before reset.
+#if ESP_IDF_VERSION_MAJOR >= 5
+  esp_task_wdt_deinit();
+  esp_task_wdt_config_t wdt_config = {
+      .timeout_ms = 10000,
+      .idle_core_mask = 0,
+      .trigger_panic = true,
+  };
+  esp_task_wdt_init(&wdt_config);
+#else
+  esp_task_wdt_init(10, true);
+#endif
+  esp_task_wdt_add(NULL);
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -1342,14 +1351,19 @@ void loop()
           inaW = ina226.power() / 1000.0f;
           outV = (inaV < 0.0f) ? 0.0f : inaV;
 
-          // Closed-loop drop compensation
+          // Closed-loop drop compensation. LPF smooths INA226 noise; deadband
+          // avoids spamming I2C writes for sub-threshold changes that oscillate.
           if (ppsOn && inaV > cmdV * 0.5f && readV > 0.3f)
           {
             float measuredDrop = readV - inaV;
             if (measuredDrop >= 0 && measuredDrop < 3.0f)
             {
-              dropComp = measuredDrop;
-              setPpsVoltage(cmdV);
+              float filtered = 0.8f * dropComp + 0.2f * measuredDrop;
+              if (fabsf(filtered - dropComp) > 0.05f)
+              {
+                dropComp = filtered;
+                setPpsVoltage(cmdV);
+              }
             }
           }
         }
